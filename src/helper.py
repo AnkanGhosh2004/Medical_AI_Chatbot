@@ -1,6 +1,6 @@
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 import os
 
 from typing import List
@@ -53,7 +53,6 @@ def text_split(minimal_docs):
   
 text_chunks=text_split(minimal_docs)
 print("Length of Text Chunks", len(text_chunks))
-from langchain.embeddings import HuggingFaceEmbeddings
 
 #Download the Embeddings from Hugging Face
 def download_hugging_face_embeddings():

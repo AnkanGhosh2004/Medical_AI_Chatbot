@@ -5,41 +5,61 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>Chatbot</title>
+		<title>AI Medical Chatbot</title>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+		<meta http-equiv="Pragma" content="no-cache" />
+		<meta http-equiv="Expires" content="0" />
 		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
 		<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-		<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css')}}"/>
+		<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css')}}?v={{ range(1,1000)|random }}"/>
+		<link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='logo.jpeg') }}">
 	</head>
 	
 	
 	<body>
 		<div class="container-fluid h-100">
 			<div class="row justify-content-center h-100">		
-				<div class="col-md-8 col-xl-6 chat">
+				<div class="col-12 col-sm-10 col-md-8 col-lg-6 chat">
 					<div class="card">
 						<div class="card-header msg_head">
-							<div class="d-flex bd-highlight">
+							<div class="d-flex bd-highlight align-items-center">
 								<div class="img_cont">
-									<img src="https://cdn-icons-png.flaticon.com/512/387/387569.png" class="rounded-circle user_img">
-									<!-- <img src="https://www.prdistribution.com/spirit/uploads/pressreleases/2019/newsreleases/d83341deb75c4c4f6b113f27b1e42cd8-chatbot-florence-already-helps-thousands-of-patients-to-remember-their-medication.png" class="rounded-circle user_img"> -->
+									<img src="{{ url_for('static', filename='logo.jpeg') }}" class="rounded-circle user_img" alt="AI Assistant Logo">
 									<span class="online_icon"></span>
 								</div>
 								<div class="user_info">
-									<span>Medical Chatbot</span>
-									<p>Ask me anything!</p>
+									<span>AI Medical Assistant</span>
+									<p>✨ Your health matters 💙—let’s take care of it together! 🌿💪</p>
 								</div>
 							</div>
 						</div>
 						<div id="messageFormeight" class="card-body msg_card_body">
-							
-							
+							<!-- Welcome message -->
+							<div class="d-flex justify-content-start mb-4 message-fade-in">
+								<div class="img_cont_msg">
+									<img src="{{ url_for('static', filename='logo.jpeg') }}" class="rounded-circle user_img_msg" alt="AI Assistant">
+								</div>
+								<div class="msg_cotainer">
+									<div style="font-weight: 500; line-height: 1.5;">
+										👋 <strong> Hi there! </strong>✨I’m your AI Health Buddy 🤖💙
+									</div>
+									<div style="margin-top: 8px; line-height: 1.4;">
+									Need answers about your health? 🩺💬 From symptoms 🤒 to prevention tips 🛡️, I’m here 24/7 ⏰ to support you.
+
+									</div>
+									
+									<span class="msg_time">Now</span>
+								</div>
+							</div>
 						</div>
 						<div class="card-footer">
 							<form id="messageArea" class="input-group">
-                                <input type="text" id="text" name="msg" placeholder="Type your message..." autocomplete="off" class="form-control type_msg" required/>
+                                <input type="text" id="text" name="msg" placeholder="Type 'hi' to start, or ask any health question..." autocomplete="off" class="form-control type_msg" required/>
 								<div class="input-group-append">
-									<button type="submit" id="send" class="input-group-text send_btn"><i class="fas fa-location-arrow"></i></button>
+									<button type="submit" id="send" class="input-group-text send_btn"><i class="fas fa-paper-plane"></i></button>
 								</div>
 							</form>
 						</div>
@@ -50,6 +70,25 @@
 		
 		<script>
 			$(document).ready(function() {
+				// Add typing indicator
+				var logoUrl = "{{ url_for('static', filename='logo.jpeg') }}";
+				function showTypingIndicator() {
+					var typingHtml = '<div class="d-flex justify-content-start mb-4 typing-indicator-container"><div class="img_cont_msg"><img src="' + logoUrl + '" class="rounded-circle user_img_msg" style="border: 2px solid #00ffff; box-shadow: 0 0 10px #00ffff;"></div><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
+					$("#messageFormeight").append(typingHtml);
+					$("#messageFormeight").scrollTop($("#messageFormeight")[0].scrollHeight);
+				}
+				
+				function hideTypingIndicator() {
+					$(".typing-indicator-container").remove();
+				}
+				
+				// Auto-scroll to bottom
+				function scrollToBottom() {
+					$("#messageFormeight").animate({
+						scrollTop: $("#messageFormeight")[0].scrollHeight
+					}, 300);
+				}
+				
 				$("#messageArea").on("submit", function(event) {
 					const date = new Date();
 					const hour = date.getHours();
@@ -57,10 +96,29 @@
 					const str_time = hour+":"+minute;
 					var rawText = $("#text").val();
 
-					var userHtml = '<div class="d-flex justify-content-end mb-4"><div class="msg_cotainer_send">' + rawText + '<span class="msg_time_send">'+ str_time + '</span></div><div class="img_cont_msg"><img src="https://i.ibb.co/d5b84Xw/Untitled-design.png" class="rounded-circle user_img_msg"></div></div>';
+					if(rawText.trim() === "") {
+						event.preventDefault();
+						return;
+					}
+
+					var userHtml = '<div class="d-flex justify-content-end mb-4 message-fade-in"><div class="msg_cotainer_send">' + rawText + '<span class="msg_time_send">'+ str_time + '</span></div><div class="img_cont_msg"><img src="{{ url_for('static', filename='logo.jpeg') }}" class="rounded-circle user_img_msg user-avatar" alt="User"></div></div>';
 					
 					$("#text").val("");
 					$("#messageFormeight").append(userHtml);
+					scrollToBottom();
+					
+					// Check if it's a simple greeting or thanks - skip typing indicator
+					var simpleResponses = ['hi', 'hello', 'hey', 'thank you', 'thanks', 'thank u', 'ty', 'good morning', 'good afternoon', 'good evening'];
+					var isSimpleResponse = simpleResponses.some(function(word) {
+						return rawText.toLowerCase().includes(word);
+					});
+					
+					// Show typing indicator only for complex questions
+					if (!isSimpleResponse) {
+						setTimeout(function() {
+							showTypingIndicator();
+						}, 500);
+					}
 
 					$.ajax({
 						data: {
@@ -69,10 +127,32 @@
 						type: "POST",
 						url: "/get",
 					}).done(function(data) {
-						var botHtml = '<div class="d-flex justify-content-start mb-4"><div class="img_cont_msg"><img src="https://cdn-icons-png.flaticon.com/512/387/387569.png" class="rounded-circle user_img_msg"></div><div class="msg_cotainer">' + data + '<span class="msg_time">' + str_time + '</span></div></div>';
+						if (!isSimpleResponse) {
+							hideTypingIndicator();
+						}
+						var botHtml = '<div class="d-flex justify-content-start mb-4 message-fade-in"><div class="img_cont_msg"><img src="' + logoUrl + '" class="rounded-circle user_img_msg" alt="AI Assistant"></div><div class="msg_cotainer">' + data + '<span class="msg_time">' + str_time + '</span></div></div>';
 						$("#messageFormeight").append($.parseHTML(botHtml));
+						scrollToBottom();
+					}).fail(function() {
+						if (!isSimpleResponse) {
+							hideTypingIndicator();
+						}
+						var errorHtml = '<div class="d-flex justify-content-start mb-4 message-fade-in"><div class="img_cont_msg"><img src="' + logoUrl + '" class="rounded-circle user_img_msg" alt="AI Assistant"></div><div class="msg_cotainer">Sorry, I encountered an error. Please try again.<span class="msg_time">' + str_time + '</span></div></div>';
+						$("#messageFormeight").append($.parseHTML(errorHtml));
+						scrollToBottom();
 					});
 					event.preventDefault();
+				});
+				
+				// Auto-focus on input
+				$("#text").focus();
+				
+				// Enter key support (with Shift+Enter for new line)
+				$("#text").keydown(function(e) {
+					if (e.which == 13 && !e.shiftKey) {
+						e.preventDefault();
+						$("#messageArea").submit();
+					}
 				});
 			});
 		</script>
