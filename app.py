@@ -1,5 +1,5 @@
-from flask import Flask, render_template, jsonify, request
-from src.helper import download_hugging_face_embeddings
+from flask import Flask, render_template, request
+from src.helper import embeddings, text_chunks
 from langchain_pinecone import PineconeVectorStore
 from langchain_openai import ChatOpenAI
 from langchain.chains import create_retrieval_chain
@@ -7,17 +7,15 @@ from langchain_together import ChatTogether
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
-from src.prompt import *
+from src.prompt import system_prompt
 import os
-import random
-import re
 
 app = Flask(__name__)
 
 load_dotenv()
 
-PINECONE_API_KEY=os.environ.get('PINECONE_API_KEY')
-TOGETHER_API_KEY=os.environ.get('TOGETHER_API_KEY')
+PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY')
+TOGETHER_API_KEY = os.environ.get('TOGETHER_API_KEY')
 
 # Check if required environment variables are set
 if not PINECONE_API_KEY:
@@ -28,27 +26,30 @@ if not TOGETHER_API_KEY:
 os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
 os.environ["TOGETHER_API_KEY"] = TOGETHER_API_KEY
 
-embeddings = download_hugging_face_embeddings()
+index_name = "medical-bot"
 
-index_name = "medical-bot" 
-# Embed each chunk and upsert the embeddings into your Pinecone index.
+# Initialize Pinecone vector store (assumes you have already upserted your text_chunks)
 docsearch = PineconeVectorStore.from_existing_index(
     index_name=index_name,
     embedding=embeddings
 )
 
+retriever = docsearch.as_retriever(search_type="similarity", search_kwargs={"k": 5})
 
-retriever = docsearch.as_retriever(search_type="similarity", search_kwargs={"k":3})
 
-
+# Custom system prompt to instruct the model to be concise and focus on main points
+concise_system_prompt = system_prompt + "\n\nPlease answer as concisely as possible, focusing only on the main essential points. Limit your response to 3-5 sentences."
 
 chatModel = ChatTogether(
-    together_api_key=os.getenv("TOGETHER_API_KEY"),
-    model="meta-llama/Llama-3-8b-chat-hf", 
+    together_api_key=TOGETHER_API_KEY,
+    model="meta-llama/Llama-3-8b-chat-hf",
+    temperature=0.1,
+    max_tokens=300,  # Reduce max tokens for shorter answers
 )
+
 prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", system_prompt),
+        ("system", concise_system_prompt),
         ("human", "{input}"),
     ]
 )
@@ -56,128 +57,68 @@ prompt = ChatPromptTemplate.from_messages(
 question_answer_chain = create_stuff_documents_chain(chatModel, prompt)
 rag_chain = create_retrieval_chain(retriever, question_answer_chain)
 
-
 @app.route("/")
-def index():
-    return render_template('chat.html')
+def home():
+    return render_template("chat.html")
 
+@app.route("/test")
+def test():
+    return "Flask is working!"
 
+# --- Simple intent detection (stub functions, you can expand) ---
 def is_greeting(message):
-    """Check if the message is a greeting"""
-    greetings = [
-        'hello', 'hi', 'hey', 'hii', 'hiii', 'hiiii',
-        'good morning', 'good afternoon', 'good evening', 
-        'morning', 'afternoon', 'evening',
-        'hola', 'namaste', 'salaam', 'greetings',
-        'howdy', 'yo', 'sup', "what's up", "whats up"
-    ]
-    message_lower = message.lower().strip()
-    return any(greeting in message_lower for greeting in greetings) or len(message_lower) <= 10
+    greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
+    return any(greet in message.lower() for greet in greetings)
 
 def is_farewell(message):
-    """Check if the message is a farewell"""
-    farewells = [
-        'bye', 'goodbye', 'good bye', 'see you', 'see ya', 'cya',
-        'thanks', 'thank you', 'thank u', 'ty', 'thx',
-        "that's all", "that's it", 'exit', 'quit', 'end',
-        'take care', 'farewell', 'adios', 'hasta la vista',
-        'have a good day', 'have a nice day', 'ttyl', 'gotta go',
-        'see you later'
-    ]
-    message_lower = message.lower().strip()
-    return any(farewell in message_lower for farewell in farewells)
+    farewells = ["bye", "goodbye", "see you", "take care"]
+    return any(farewell in message.lower() for farewell in farewells)
 
 def is_small_talk(message):
-    """Check if the message is small talk"""
-    message_lower = message.lower().strip()
-    small_talk_patterns = [
-        'how are you', 'how r u', 'how do you do',
-        'what is your name', 'whats your name', "what's your name",
-        'are you a bot', 'are you ai', 'are you artificial intelligence',
-        'who are you', 'what are you'
-    ]
-    return any(pattern in message_lower for pattern in small_talk_patterns)
-
-def get_time_based_greeting():
-    """Get time-appropriate greeting"""
-    import datetime
-    current_hour = datetime.datetime.now().hour
-    if 5 <= current_hour < 12:
-        return "Good morning"
-    elif 12 <= current_hour < 17:
-        return "Good afternoon"
-    elif 17 <= current_hour < 21:
-        return "Good evening"
-    else:
-        return "Hello"
+    small_talks = ["how are you", "what's up", "how's it going"]
+    return any(st in message.lower() for st in small_talks)
 
 def get_greeting_response():
-    """Return a random friendly greeting response"""
-    greeting_responses = [
-        "Hello! 👋 How can I help you today?",
-        "Hi there! 😊 What's on your mind?",
-        "Hey! I'm here to assist you. What would you like to know?",
-        f"{get_time_based_greeting()}! How can I support you today?",
-        "Welcome! Ready to get your health questions answered? 🏥"
-    ]
-    return random.choice(greeting_responses)
+    return "Hello! How can I assist you with your health today?"
 
 def get_farewell_response():
-    """Return a random friendly farewell response"""
-    farewell_responses = [
-        "You're welcome! Have a great day ahead 🌸",
-        "Glad I could help! Goodbye 👋",
-        "Take care and feel free to come back anytime 🚀",
-        "It was nice chatting with you. See you soon! 😊",
-        "Thanks for chatting! Wishing you all the best 🌟"
-    ]
-    return random.choice(farewell_responses)
+    return "Goodbye! Stay healthy and feel free to return if you have more questions."
 
 def get_small_talk_response(message):
-    """Handle small talk conversations"""
-    message_lower = message.lower().strip()
-    
-    if any(phrase in message_lower for phrase in ['how are you', 'how r u', 'how do you do']):
-        return "I'm doing great, thanks for asking! How about you? 😊 Is there anything health-related I can help you with?"
-    
-    elif any(phrase in message_lower for phrase in ['what is your name', 'whats your name', "what's your name"]):
-        return "I'm your AI Medical Assistant 🤖, here to help you with health and medical questions!"
-    
-    elif any(phrase in message_lower for phrase in ['are you a bot', 'are you ai', 'are you artificial intelligence']):
-        return "Yes, I'm an AI chatbot built to assist you with medical information and health questions! 🤖💙"
-    
-    elif any(phrase in message_lower for phrase in ['who are you', 'what are you']):
-        return "I'm your friendly AI Medical Assistant! 🏥 I'm here to provide health information and answer your medical questions. How can I help you today?"
-    
-    return None
+    return "I'm here to help you with your health-related questions!"
 
-@app.route("/get", methods=["GET", "POST"])
+@app.route("/get", methods=["POST"])
 def chat():
     msg = request.form["msg"]
-    input = msg
-    print(input)
-    
-    # Check for small talk first
-    if is_small_talk(msg):
-        small_talk_response = get_small_talk_response(msg)
-        if small_talk_response:
-            return small_talk_response
+    input_text = msg.strip()
+    print("User input:", input_text)
 
-    # Check for farewells next
-    if is_farewell(msg):
+    # Intent handling
+    if is_small_talk(input_text):
+        return get_small_talk_response(input_text)
+    if is_farewell(input_text):
         return get_farewell_response()
-
-    # Check for greetings
-    if is_greeting(msg):
+    if is_greeting(input_text):
         return get_greeting_response()
 
-    # Process medical queries
-    response = rag_chain.invoke({"input": msg})
-    print("Response : ", response["answer"])
-    return str(response["answer"])
+    # Medical Q&A via RAG
+    try:
+        response = rag_chain.invoke({"input": input_text})
+        # Handle different possible response formats
+        if isinstance(response, dict):
+            if "answer" in response:
+                return response["answer"]
+            elif "output" in response:
+                return response["output"]
+        return str(response)
+    except Exception as e:
+        import traceback
+        print("Error in RAG chain:", e)
+        traceback.print_exc()
+        return "Sorry, I couldn't process your request at the moment. Please try again later."
 
 
-
+    
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host="0.0.0.0", port=port, debug=False)

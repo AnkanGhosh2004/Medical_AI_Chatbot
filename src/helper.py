@@ -1,10 +1,11 @@
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+from sentence_transformers import SentenceTransformer
 import os
 
 from typing import List
 from langchain.schema import Document
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 
 #Extract Data From the PDF File
@@ -56,7 +57,10 @@ print("Length of Text Chunks", len(text_chunks))
 
 #Download the Embeddings from Hugging Face
 def download_hugging_face_embeddings():
-    embeddings=HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
+    embeddings = HuggingFaceEmbeddings(
+        model_name='sentence-transformers/all-MiniLM-L6-v2',
+        model_kwargs={'device': 'cuda'}  # This tells it to use GPU
+    )
     return embeddings
 
 embeddings = download_hugging_face_embeddings()
